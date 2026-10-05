@@ -64,3 +64,10 @@ test('Changing pick shape, long gaps and tracking loss do not reposition the gui
  const resumed=tracker.update([hand('R',.15,.6),hand('L',.6,.7)],640,480,6000);assert.deepEqual(geometry(resumed),original);
  tracker.reset();const reset=tracker.update([hand('R',.15,.6),hand('L',.6,.7)],640,480,6040);assert.notDeepEqual(geometry(reset),original);
 });
+
+ test('Only explicit repositioning resets the guitar lock in the application',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const app=await readFile(new URL('../app.js',import.meta.url),'utf8');
+ assert.equal((app.match(/guitarTracker\.reset\(\)/g)||[]).length,1);
+ assert.match(app,/\$\('#recenter'\)\.onclick=\(\)=>\{guitarTracker\.reset\(\)/);
+ });

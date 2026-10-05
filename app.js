@@ -28,7 +28,7 @@ function play(i) {
 }
 function challengeUI(){ $('#challengeUI').innerHTML=challenge?`Toque: <span class="target">${NOTES[target]}</span> · Pontos ${score} · Combo ×${combo}`:'Modo livre'; }
 function selectMode(next){
-  mode=next; gestures.reset();guitarTracker.reset();guitarPose={ready:false};lastGuitarHit=-Infinity; demoGeneration++; instruments?.stop();
+  mode=next; gestures.reset();guitarPose={...guitarTracker.pose,ready:false};lastGuitarHit=-Infinity; demoGeneration++; instruments?.stop();
   for(const button of document.querySelectorAll('[data-mode]')){const active=button.dataset.mode===mode;button.classList.toggle('on',active);button.setAttribute('aria-pressed',active);}
   for (const id of ['keys','pianoLesson','pianoGhost']) $('#'+id).hidden=mode!=='piano';
   for (const id of ['guitar','guitarLesson','guitarGhost','recenter']) $('#'+id).hidden=mode!=='guitar';
@@ -41,7 +41,7 @@ $('#recenter').onclick=()=>{guitarTracker.reset();gestures.reset();guitarPose={r
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>selectMode(button.dataset.mode));
 $('#challenge').onclick=()=>{challenge=!challenge;score=combo=0;target=Math.floor(Math.random()*8);$('#challenge').setAttribute('aria-pressed',challenge);challengeUI();};
 $('#volume').oninput=()=>instruments?.volume(Number($('#volume').value)/100);
-$('#mirror').onclick=()=>{mirror=!mirror;video.style.transform=mirror?'scaleX(-1)':'none';$('#mirror').textContent=`Espelho: ${mirror?'ligado':'desligado'}`;$('#mirror').setAttribute('aria-pressed',mirror);gestures.reset();guitarTracker.reset();guitarPose={ready:false};draw([],performance.now());};
+$('#mirror').onclick=()=>{mirror=!mirror;video.style.transform=mirror?'scaleX(-1)':'none';$('#mirror').textContent=`Espelho: ${mirror?'ligado':'desligado'}`;$('#mirror').setAttribute('aria-pressed',mirror);gestures.reset();guitarPose={...guitarTracker.pose,ready:false};draw([],performance.now());};
 $('#demo').onclick=async()=>{
   try {await ensureAudio();demoGeneration++;const token=demoGeneration;instruments.stop();
     for(const [step,note] of [0,2,4,7,4,2,0].entries()) setTimeout(()=>{if(token===demoGeneration)play(note);},step*330);
@@ -50,9 +50,9 @@ $('#demo').onclick=async()=>{
 function stopCamera(){
   generation++;cancelAnimationFrame(frame);frame=0;
   video.srcObject?.getTracks().forEach(track=>track.stop());video.srcObject=null;
-  detector?.close();detector=null;gestures.reset();guitarTracker.reset();guitarPose={ready:false};lastVideo=-1;lastGuitarHit=-Infinity;
+  detector?.close();detector=null;gestures.reset();guitarPose={...guitarTracker.pose,ready:false};lastVideo=-1;lastGuitarHit=-Infinity;
   ctx.clearRect(0,0,canvas.width,canvas.height);$('#start').disabled=false;$('#stop').disabled=true;
-  draw([],performance.now());$('#guitarGhost').hidden=mode!=='guitar';document.querySelectorAll('.fret.selected').forEach(key=>key.classList.remove('selected'));status.textContent='Câmera desligada';$('#pianoGhost .ghost').classList.remove('active');$('#noteGhost').classList.remove('active');$('#strumGhost').classList.remove('active');
+  draw([],performance.now());$('#guitarGhost').hidden=mode!=='guitar'||guitarPose.locked;document.querySelectorAll('.fret.selected').forEach(key=>key.classList.remove('selected'));status.textContent='Câmera desligada';$('#pianoGhost .ghost').classList.remove('active');$('#noteGhost').classList.remove('active');$('#strumGhost').classList.remove('active');
 }
 window.stopAirMusic=()=>{stopCamera();demoGeneration++;instruments?.stop();};
 window.pauseAirMusic=()=>{if(video.srcObject)window.stopAirMusic();};
@@ -82,6 +82,7 @@ $('#start').onclick=async()=>{
 const connections=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
 function draw(hands,time=performance.now()){
   const w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);
+  $('#guitarLock').hidden=mode!=='guitar';$('#guitarLock').textContent=guitarPose.locked?'🔒 Guitarra travada · v1.2.2':'Mostre as duas mãos para travar · v1.2.2';
   if(mode==='guitar')drawGuitar(ctx,guitarPose,w,h,time,lastGuitarHit,playedGuitarNote);
   for(const hand of hands){ctx.strokeStyle='#76e0c5';ctx.fillStyle='#76e0c5';ctx.lineWidth=2;
     for(const[a,b]of connections){ctx.beginPath();ctx.moveTo(hand.points[a].x*w,hand.points[a].y*h);ctx.lineTo(hand.points[b].x*w,hand.points[b].y*h);ctx.stroke();}
