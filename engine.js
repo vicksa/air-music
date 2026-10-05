@@ -16,7 +16,7 @@ export function projectHands(result, mirror = true) {
 export class Gestures {
   constructor() { this.reset(); }
   reset() { this.previous = new Map(); this.strum = null; }
-  process(hands, mode, now, sensitivity = 24) {
+  process(hands, mode, now, sensitivity = 24, guitarPose = null) {
     const notes = [];
     const threshold = .10 + (45 - sensitivity) * .008;
     if (mode === 'piano') {
@@ -38,15 +38,18 @@ export class Gestures {
       for (const id of this.previous.keys()) if (!seen.has(id)) this.previous.delete(id);
     } else {
       const ordered = [...hands].sort((a,b) => a.cx - b.cx);
-      const selector = ordered[0], strummer = ordered.at(-1);
-      if (hands.length < 2 || selector.cx >= .5 || strummer.cx <= .5) { this.strum = null; return notes; }
+      const selector = guitarPose?.selector || ordered[0], strummer = guitarPose?.strummer || ordered.at(-1);
+      if (hands.length < 2 || (guitarPose ? !guitarPose.ready || !guitarPose.onNeck : selector.cx >= .5 || strummer.cx <= .5)) { this.strum = null; return notes; }
+      const position=guitarPose ? guitarPose.distance : strummer.cy-.58;
+      const style=guitarPose?.style || 'fixed';
       const old = this.strum;
-      const state = { y: strummer.cy, id: strummer.id, time: now, played: old?.played ?? -Infinity };
-      if (old && old.id === strummer.id && now > old.time && now - old.time < 180) {
-        const speed = Math.abs(strummer.cy - old.y) / ((now - old.time) / 1000);
-        const crossing = (old.y < .58 && strummer.cy >= .58) || (old.y > .58 && strummer.cy <= .58);
+      const side=Math.abs(position)>.012?Math.sign(position):0;
+      const state = { y: position, id: strummer.id, style, side:side || (old?.style===style&&old?.id===strummer.id?old.side:0) || 0, time: now, played: old?.played ?? -Infinity };
+      if (old && old.id === strummer.id && old.style === style && now > old.time && now - old.time < 180) {
+        const speed = Math.abs(position - old.y) / ((now - old.time) / 1000);
+        const crossing = guitarPose ? side && old.side && side!==old.side : (old.y < 0 && position >= 0) || (old.y > 0 && position <= 0);
         if (crossing && speed > threshold * .55 && now - state.played > 160) {
-          notes.push(noteAt(selector.points[8].x, .06, .47)); state.played = now;
+          notes.push(guitarPose ? guitarPose.selectedNote : noteAt(selector.points[8].x, .06, .47)); state.played = now;
         }
       }
       this.strum = state;
