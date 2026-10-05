@@ -13,37 +13,31 @@ export function localPoint(point,pose) {
 }
 export class GuitarTracker {
   constructor(){this.reset();}
-  reset(){this.pose=null;this.lastTime=null;}
+  reset(){this.pose=null;}
   update(hands,width,height,time) {
     const sorted=[...hands].sort((a,b)=>a.cx-b.cx),left=sorted[0],right=sorted.at(-1);
-    if(hands.length<2||right.cx-left.cx<.16){this.reset();return {ready:false};}
+    if(hands.length<2||right.cx-left.cx<.16)return {...this.pose,ready:false};
     const shape=handShape(right),leftShape=handShape(left);
     const strum=shape.pinch?{x:(right.points[4].x+right.points[8].x)/2,y:(right.points[4].y+right.points[8].y)/2}:{x:right.cx,y:right.cy};
     const grip={x:(left.points[0].x+left.points[9].x)/2*width,y:(left.points[0].y+left.points[9].y)/2*height};
     const target={x:strum.x*width,y:strum.y*height};
     const angle=clamp(Math.atan2(target.y-grip.y,target.x-grip.x),-.45,.45);
     const style=shape.pinch?'pinch':'palm';
-    if(!this.pose||this.pose.style!==style||time-this.lastTime>220){
-      this.pose={...target,angle,size:clamp(distance(target,grip)*1.10,width*.32,width*.59),style};
-    }else{
-      // Follow the resting position slowly, so the strings do not chase a strum.
-      const follow=1-Math.exp(-Math.max(0,time-this.lastTime)/900);
-      this.pose.x+=(target.x-this.pose.x)*follow;this.pose.y+=(target.y-this.pose.y)*follow;
-      this.pose.angle+=(angle-this.pose.angle)*follow;
-    }
-    this.lastTime=time;
+    // Calibrate once. Hand movement, shape changes and detection gaps never move the instrument.
+    if(!this.pose)this.pose={...target,angle,size:clamp(distance(target,grip)*1.10,width*.32,width*.59),locked:true};
     const tip=localPoint({x:left.points[8].x*width,y:left.points[8].y*height},this.pose);
     const pluck=localPoint(target,this.pose);
-    return {...this.pose,ready:true,selector:left,strummer:right,selectedNote:fretAt(tip.x),onNeck:Math.abs(tip.y)<.28&&tip.x> -1.20&&tip.x< -.18,
+    this.pose.selectedNote=fretAt(tip.x);
+    return {...this.pose,style,ready:true,selector:left,strummer:right,selectedNote:fretAt(tip.x),onNeck:Math.abs(tip.y)<.28&&tip.x> -1.20&&tip.x< -.18,
       distance:pluck.y*this.pose.size/height,pinched:shape.pinch,gripped:leftShape.grip,tip,pluck};
   }
 }
 export function drawGuitar(ctx,pose,width,height,time=0,lastHit=-Infinity,playedNote=0) {
   const live=pose?.ready;
-  const frame=live?pose:{x:width*.75,y:height*.60,size:width*.51,angle:0,selectedNote:0};
+  const frame=pose?.locked?pose:{x:width*.75,y:height*.60,size:width*.51,angle:0,selectedNote:0};
   const s=frame.size,glow=Math.max(0,1-(time-lastHit)/230);
   ctx.save();ctx.translate(frame.x,frame.y);ctx.rotate(frame.angle);ctx.scale(s,s);
-  ctx.globalAlpha=live?.88:.40;
+  ctx.globalAlpha=live?.88:frame.locked?.70:.40;
   const wood=ctx.createLinearGradient(-.32,-.3,.3,.3);wood.addColorStop(0,'#bf7948');wood.addColorStop(.5,'#713b2d');wood.addColorStop(1,'#dc9b5e');
   ctx.fillStyle=wood;ctx.strokeStyle=live?'#f2bf84':'#8e786a';ctx.lineWidth=.010;
   ctx.beginPath();ctx.moveTo(-.28,-.11);ctx.bezierCurveTo(-.43,-.30,-.24,-.34,-.13,-.19);ctx.bezierCurveTo(-.02,-.15,.04,-.34,.17,-.25);ctx.bezierCurveTo(.34,-.12,.32,.16,.17,.28);ctx.bezierCurveTo(.03,.38,-.09,.21,-.2,.16);ctx.bezierCurveTo(-.43,.31,-.43,.07,-.28,.08);ctx.closePath();ctx.fill();ctx.stroke();

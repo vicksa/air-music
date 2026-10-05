@@ -9,12 +9,12 @@ test('Pinch detection uses hand proportions instead of camera distance',()=>{
  const scaled={...h,points:h.points.map(p=>({x:p.x*.5,y:p.y*.5}))};assert.ok(handShape(scaled).pinch);
  h.points[8].x=.88;assert.equal(handShape(h).pinch,false);
 });
-test('Virtual guitar requires two separated hands and recalibrates after tracking loss',()=>{
+test('Virtual guitar requires two separated hands and keeps its position after tracking loss',()=>{
  const tracker=new GuitarTracker();assert.equal(tracker.update([],640,480,0).ready,false);
  assert.equal(tracker.update([hand('Right',.2,.5)],640,480,0).ready,false);
  const frame=tracker.update([hand('Right',.2,.5),hand('Left',.8,.5)],640,480,40);
  assert.ok(frame.ready);assert.ok(frame.size>0);assert.equal(frame.strummer.id,'Left');
- tracker.update([],640,480,80);assert.equal(tracker.pose,null);
+ const locked={...tracker.pose};tracker.update([],640,480,80);assert.deepEqual(tracker.pose,locked);
  assert.equal(tracker.update([hand('Right',.2,.5),hand('Left',.3,.5)],640,480,120).ready,false);
 });
 test('Frets map to the visible neck and keep instrument size while the selection hand moves',()=>{
@@ -28,10 +28,10 @@ test('Projection stays aligned when the guitar rotates',()=>{
  const p=localPoint({x:10,y:30},{x:10,y:10,angle:Math.PI/2,size:20});
  assert.ok(Math.abs(p.x-1)<1e-9);assert.ok(Math.abs(p.y)<1e-9);
 });
-test('Strings follow slowly, leaving space for a stroke instead of chasing the hand',()=>{
+test('Guitar stays completely fixed when either hand moves',()=>{
  const tracker=new GuitarTracker();tracker.update([hand('R',.2,.5),hand('L',.8,.5)],640,480,0);
  const moved=tracker.update([hand('R',.2,.5),hand('L',.8,.65)],640,480,40);
- assert.ok(moved.y<.55*480);assert.ok(moved.distance>.10);
+ assert.equal(moved.y,.5*480);assert.equal(moved.x,.8*640);assert.equal(moved.angle,0);assert.ok(moved.distance>.10);
 });
 test('Moving string line uses selected visible fret, and missing neck contact prevents playing',()=>{
  const g=new Gestures(),left=hand('R',.2,.5),right=hand('L',.8,.5);
@@ -53,4 +53,14 @@ test('Fingertip outside the visible neck is not treated as fret contact',()=>{
  const tracker=new GuitarTracker(),left=hand('R',.2,.5),right=hand('L',.8,.5);
  left.points[8]={x:.97,y:.5};
  assert.equal(tracker.update([left,right],640,480,0).onNeck,false);
+});
+
+test('Changing pick shape, long gaps and tracking loss do not reposition the guitar',()=>{
+ const tracker=new GuitarTracker();tracker.update([hand('R',.2,.5),hand('L',.8,.5)],640,480,0);
+ const geometry=({x,y,size,angle})=>({x,y,size,angle});const original=geometry(tracker.pose);
+ const shaped=tracker.update([hand('R',.3,.4),pinchHand()],640,480,4000);
+ assert.deepEqual(geometry(shaped),original);
+ const missing=tracker.update([],640,480,5000);assert.ok(missing.locked);assert.equal(missing.ready,false);assert.deepEqual(geometry(missing),original);
+ const resumed=tracker.update([hand('R',.15,.6),hand('L',.6,.7)],640,480,6000);assert.deepEqual(geometry(resumed),original);
+ tracker.reset();const reset=tracker.update([hand('R',.15,.6),hand('L',.6,.7)],640,480,6040);assert.notDeepEqual(geometry(reset),original);
 });

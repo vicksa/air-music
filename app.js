@@ -34,7 +34,7 @@ function selectMode(next){
   for (const id of ['guitar','guitarLesson','guitarGhost','recenter']) $('#'+id).hidden=mode!=='guitar';
   $('#demo').textContent=mode==='guitar'?'Ouvir guitarra':'Ouvir piano';
   $('#screenLabels').innerHTML=mode==='piano'?'<span>← Notas graves</span><span>Notas agudas →</span>':'<span>Escolher nota</span><span>Palhetar ↕</span>';
-  $('#feedback').textContent=mode==='piano'?'Desça para tocar e levante para preparar a próxima nota.':'Segure o braço da guitarra com a mão à esquerda da tela. Faça a palhetada sobre o corpo da guitarra.';
+  $('#feedback').textContent=mode==='piano'?'Desça para tocar e levante para preparar a próxima nota.':'A guitarra fica fixa. Mova o indicador pelos trastes e palhete sobre as cordas. Para mudar a posição, toque em Reposicionar guitarra.';
   draw([],performance.now());
 }
 $('#recenter').onclick=()=>{guitarTracker.reset();gestures.reset();guitarPose={ready:false};lastGuitarHit=-Infinity;draw([],performance.now());$('#feedback').textContent='Mostre as duas mãos na posição confortável para reposicionar a guitarra.';};
@@ -91,10 +91,10 @@ function draw(hands,time=performance.now()){
 function guide(hands){
   $('#pianoGhost .ghost').classList.toggle('active',hands.length>0);
   const left=guitarPose.ready?guitarPose.selector:hands.find(h=>h.cx<.5),right=guitarPose.ready?guitarPose.strummer:hands.find(h=>h.cx>.5);
-  $('#guitarGhost').hidden=mode!=='guitar'||guitarPose.ready;$('#noteGhost').classList.toggle('active',!!left);$('#strumGhost').classList.toggle('active',!!right);
+  $('#guitarGhost').hidden=mode!=='guitar'||guitarPose.locked;$('#noteGhost').classList.toggle('active',!!left);$('#strumGhost').classList.toggle('active',!!right);
   document.querySelectorAll('.fret.selected').forEach(key=>key.classList.remove('selected'));
   if(mode==='guitar'&&left)$(`.fret[data-i="${guitarPose.ready?guitarPose.selectedNote:noteAt(left.points[8].x,.06,.47)}"]`).classList.add('selected');
-  status.textContent=mode==='piano'?(hands.length?`${hands.length} mão(s) · desça o indicador para tocar`:'Mostre a mão inteira para a câmera'):(!guitarPose.ready?'Afaste as mãos: uma no braço, outra no corpo da guitarra':!guitarPose.onNeck?'Aproxime o indicador do braço da guitarra':guitarPose.pinched?(guitarPose.gripped?'Pegada e palheta reconhecidas · toque as cordas':'Palheta reconhecida · toque as cordas'): 'Junte polegar e indicador sobre as cordas');
+  status.textContent=mode==='piano'?(hands.length?`${hands.length} mão(s) · desça o indicador para tocar`:'Mostre a mão inteira para a câmera'):(!guitarPose.ready?(guitarPose.locked?'Guitarra fixa · mostre as duas mãos para continuar':'Mostre as duas mãos para posicionar e fixar a guitarra'):!guitarPose.onNeck?'Aproxime o indicador do braço da guitarra':guitarPose.pinched?(guitarPose.gripped?'Pegada e palheta reconhecidas · toque as cordas':'Palheta reconhecida · toque as cordas'): 'Junte polegar e indicador sobre as cordas');
 }
 function loop(time){
   if(!detector)return;
